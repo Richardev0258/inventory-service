@@ -1,4 +1,4 @@
-package com.example.inventory_service;
+package com.admincore.microservice.inventory;
 
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
