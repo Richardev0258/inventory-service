@@ -1,13 +1,16 @@
 package com.admincore.microservice.inventory;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class InventoryServiceApplicationTests {
+import static org.junit.jupiter.api.Assertions.*;
+
+class InventoryServiceApplicationTest {
 
 	@Test
-	void contextLoads() {
+	void testMainMethod() {
+		assertDoesNotThrow(() -> {
+			String[] args = {};
+			InventoryServiceApplication.main(args);
+		});
 	}
-
 }
