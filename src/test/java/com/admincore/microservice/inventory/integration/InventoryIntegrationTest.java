@@ -1,6 +1,7 @@
 package com.admincore.microservice.inventory.integration;
 
 import com.admincore.microservice.inventory.InventoryServiceApplication;
+import com.admincore.microservice.inventory.client.ProductServiceClient;
 import com.admincore.microservice.inventory.dto.InventoryRequest;
 import com.admincore.microservice.inventory.dto.PurchaseRequest;
 import com.admincore.microservice.inventory.model.Inventory;
@@ -12,16 +13,21 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureWebMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(classes = InventoryServiceApplication.class)
+@SpringBootTest(classes = {InventoryServiceApplication.class, InventoryIntegrationTest.TestConfig.class})
 @ActiveProfiles("test")
 @AutoConfigureWebMvc
 class InventoryIntegrationTest {
@@ -37,15 +43,29 @@ class InventoryIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private ProductServiceClient productServiceClient;
+
     @BeforeEach
     public void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
         inventoryRepository.deleteAll();
+
+        when(productServiceClient.isProductAvailable(anyLong())).thenReturn(true);
+        when(productServiceClient.getProductName(anyLong())).thenReturn("Test Product");
     }
 
     @AfterEach
     public void tearDown() {
         inventoryRepository.deleteAll();
+    }
+
+    @TestConfiguration
+    static class TestConfig {
+        @Bean
+        public ProductServiceClient productServiceClient() {
+            return mock(ProductServiceClient.class);
+        }
     }
 
     @Test
@@ -109,7 +129,8 @@ class InventoryIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.productId").value(1L))
-                .andExpect(jsonPath("$.data.purchasedQuantity").value(3));
+                .andExpect(jsonPath("$.data.purchasedQuantity").value(3))
+                .andExpect(jsonPath("$.data.productName").value("Test Product"));
 
         mockMvc.perform(get("/inventory/1"))
                 .andExpect(status().isOk())
