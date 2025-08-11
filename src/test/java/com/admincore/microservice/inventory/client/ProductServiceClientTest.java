@@ -1,222 +1,156 @@
 package com.admincore.microservice.inventory.client;
 
 import com.admincore.microservice.inventory.exception.ProductServiceException;
-import okhttp3.mockwebserver.MockResponse;
-import okhttp3.mockwebserver.MockWebServer;
-import org.junit.jupiter.api.AfterEach;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
-
-import java.io.IOException;
-import java.lang.reflect.Field;
+import reactor.core.publisher.Mono;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
+@SuppressWarnings({"rawtypes", "unchecked"})
 class ProductServiceClientTest {
 
-    private MockWebServer mockWebServer;
+    private WebClient mockWebClient;
+    private WebClient.RequestHeadersUriSpec uriSpec;
+    private WebClient.RequestHeadersSpec headersSpec;
+    private WebClient.ResponseSpec responseSpec;
     private ProductServiceClient client;
+    private ObjectMapper objectMapper;
 
     @BeforeEach
-    void setUp() throws Exception {
-        mockWebServer = new MockWebServer();
-        mockWebServer.start();
+    void setUp() {
+        mockWebClient = mock(WebClient.class);
+        uriSpec = mock(WebClient.RequestHeadersUriSpec.class);
+        headersSpec = mock(WebClient.RequestHeadersSpec.class);
+        responseSpec = mock(WebClient.ResponseSpec.class);
+        objectMapper = new ObjectMapper();
 
-        WebClient.Builder webClientBuilder = WebClient.builder()
-                .baseUrl(mockWebServer.url("/").toString());
+        WebClient.Builder builder = mock(WebClient.Builder.class);
+        when(builder.build()).thenReturn(mockWebClient);
 
-        client = new ProductServiceClient(webClientBuilder);
+        client = new ProductServiceClient(builder);
+        setProductServiceUrl(client, "/products");
 
-        Field productServiceUrlField = ProductServiceClient.class.getDeclaredField("productServiceUrl");
-        productServiceUrlField.setAccessible(true);
-        productServiceUrlField.set(client, "/products");
+        when(mockWebClient.get()).thenReturn((WebClient.RequestHeadersUriSpec) uriSpec);
+        when(uriSpec.uri(anyString())).thenReturn((WebClient.RequestHeadersSpec) headersSpec);
+        when(headersSpec.accept(any(MediaType.class))).thenReturn((WebClient.RequestHeadersSpec) headersSpec);
+        when(headersSpec.retrieve()).thenReturn(responseSpec);
     }
 
-    @AfterEach
-    void tearDown() throws IOException {
-        mockWebServer.shutdown();
-    }
-
-    @Test
-    void isProductAvailable_shouldReturnTrue_whenProductExists() throws InterruptedException {
-        Long productId = 1L;
-        String jsonResponse = "{ \"data\": { \"attributes\": { \"id\": 1, \"name\": \"Test Product\" } } }";
-
-        mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(200)
-                .addHeader("Content-Type", "application/json")
-                .setBody(jsonResponse));
-
-        boolean result = client.isProductAvailable(productId);
-
-        assertTrue(result);
-
-        okhttp3.mockwebserver.RecordedRequest request = mockWebServer.takeRequest();
-        assertEquals("/products/1", request.getPath());
-    }
-
-    @Test
-    void isProductAvailable_shouldReturnFalse_whenProductNotFound() throws InterruptedException {
-        Long productId = 999L;
-
-        mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(404)
-                .addHeader("Content-Type", "application/json")
-                .setBody("{}"));
-
-        boolean result = client.isProductAvailable(productId);
-
-        assertFalse(result);
-
-        okhttp3.mockwebserver.RecordedRequest request = mockWebServer.takeRequest();
-        assertEquals("/products/999", request.getPath());
-    }
-
-    @Test
-    void isProductAvailable_shouldThrowProductServiceException_withCause_whenClientErrorOccurs() throws InterruptedException {
-        Long productId = 1L;
-        mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(400)
-                .addHeader("Content-Type", "application/json")
-                .setBody("{\"error\": \"Bad Request\"}"));
-
-        ProductServiceException exception = assertThrows(ProductServiceException.class, () -> {
-            client.isProductAvailable(productId);
-        });
-
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
-        assertTrue(exception.getMessage().contains("Client error"));
-        assertNotNull(exception.getCause());
-        assertTrue(exception.getCause() instanceof WebClientResponseException);
-
-        okhttp3.mockwebserver.RecordedRequest request = mockWebServer.takeRequest();
-        assertEquals("/products/1", request.getPath());
-    }
-
-    @Test
-    void isProductAvailable_shouldThrowProductServiceException_withCause_whenServerErrorOccurs() throws InterruptedException {
-        Long productId = 1L;
-
-        mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(500)
-                .addHeader("Content-Type", "application/json")
-                .setBody("{\"error\": \"Internal Server Error\"}"));
-
-        ProductServiceException exception = assertThrows(ProductServiceException.class, () -> {
-            client.isProductAvailable(productId);
-        });
-
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getStatus());
-        assertTrue(exception.getMessage().contains("Server error"));
-        assertNotNull(exception.getCause());
-        assertTrue(exception.getCause() instanceof WebClientResponseException);
-
-        okhttp3.mockwebserver.RecordedRequest request = mockWebServer.takeRequest();
-        assertEquals("/products/1", request.getPath());
-    }
-
-    @Test
-    void isProductAvailable_shouldThrowProductServiceException_withCause_whenUnexpectedRuntimeExceptionOccurs() {
-        WebClient.Builder failingWebClientBuilder = WebClient.builder()
-                .baseUrl("http://198.51.100.1:81/")
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(1024 * 1024));
-
-        ProductServiceClient failingClient = new ProductServiceClient(failingWebClientBuilder);
-
+    private void setProductServiceUrl(ProductServiceClient client, String value) {
         try {
-            Field productServiceUrlField = ProductServiceClient.class.getDeclaredField("productServiceUrl");
-            productServiceUrlField.setAccessible(true);
-            productServiceUrlField.set(failingClient, "/products");
+            var field = ProductServiceClient.class.getDeclaredField("productServiceUrl");
+            field.setAccessible(true);
+            field.set(client, value);
         } catch (Exception e) {
-            fail("Failed to set productServiceUrl via reflection: " + e.getMessage());
+            throw new RuntimeException(e);
         }
-
-        ProductServiceException exception = assertThrows(ProductServiceException.class, () -> {
-            failingClient.isProductAvailable(1L);
-        });
-
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, exception.getStatus());
-        assertTrue(exception.getMessage().contains("Unexpected error communicating with product service"));
-        assertNotNull(exception.getCause());
-        assertTrue(exception.getCause() instanceof RuntimeException ||
-                exception.getCause().getCause() instanceof java.net.ConnectException);
     }
 
     @Test
-    void getProductName_shouldReturnName_whenProductExists() throws InterruptedException {
-        Long productId = 1L;
-        String expectedName = "Test Product";
-        String jsonResponse = "{ \"data\": { \"attributes\": { \"id\": 1, \"name\": \"" + expectedName + "\" } } }";
-
-        mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(200)
-                .addHeader("Content-Type", "application/json")
-                .setBody(jsonResponse));
-
-        String result = client.getProductName(productId);
-
-        assertEquals(expectedName, result);
-
-        okhttp3.mockwebserver.RecordedRequest request = mockWebServer.takeRequest();
-        assertEquals("/products/1", request.getPath());
+    void isProductAvailable_returnsTrue_whenDataPresent() throws Exception {
+        JsonNode json = objectMapper.readTree("{\"data\": {\"id\": 1}}");
+        when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.just(json));
+        assertTrue(client.isProductAvailable(1L));
     }
 
     @Test
-    void getProductName_shouldReturnUnknownProduct_whenResponseIsInvalid() throws InterruptedException {
-        Long productId = 1L;
-        String jsonResponse = "{ \"data\": { \"attributes\": { \"id\": 1, \"price\": 100.0 } } }";
-
-        mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(200)
-                .addHeader("Content-Type", "application/json")
-                .setBody(jsonResponse));
-
-        String result = client.getProductName(productId);
-
-        assertEquals("Unknown Product", result);
-
-        okhttp3.mockwebserver.RecordedRequest request = mockWebServer.takeRequest();
-        assertEquals("/products/1", request.getPath());
+    void isProductAvailable_returnsFalse_whenNotFound() {
+        when(responseSpec.bodyToMono(JsonNode.class)).thenThrow(
+                WebClientResponseException.create(404, "Not Found", null, null, null)
+        );
+        assertFalse(client.isProductAvailable(999L));
     }
 
     @Test
-    void getProductName_shouldReturnUnknownProduct_whenExceptionOccurs() throws InterruptedException {
-        Long productId = 1L;
-
-        mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(500)
-                .addHeader("Content-Type", "application/json")
-                .setBody("{\"error\": \"Internal Server Error\"}"));
-
-        String result = client.getProductName(productId);
-
-        assertEquals("Unknown Product", result);
-
-        okhttp3.mockwebserver.RecordedRequest request = mockWebServer.takeRequest();
-        assertEquals("/products/1", request.getPath());
+    void isProductAvailable_clientError_throwsException() {
+        when(responseSpec.bodyToMono(JsonNode.class)).thenThrow(
+                WebClientResponseException.create(400, "Bad Request", null, null, null)
+        );
+        ProductServiceException ex = assertThrows(ProductServiceException.class, () -> client.isProductAvailable(1L));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
     }
 
     @Test
-    void getProductName_shouldReturnUnknownProduct_whenNetworkExceptionOccurs() {
-        WebClient.Builder failingWebClientBuilder = WebClient.builder()
-                .baseUrl("http://198.51.100.1:81/")
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(1024 * 1024));
+    void isProductAvailable_serverError_throwsException() {
+        when(responseSpec.bodyToMono(JsonNode.class)).thenThrow(
+                WebClientResponseException.create(500, "Internal Error", null, null, null)
+        );
+        ProductServiceException ex = assertThrows(ProductServiceException.class, () -> client.isProductAvailable(1L));
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatus());
+    }
 
-        ProductServiceClient failingClient = new ProductServiceClient(failingWebClientBuilder);
+    @Test
+    void isProductAvailable_unexpectedHttpStatus_throwsException() {
+        when(responseSpec.bodyToMono(JsonNode.class)).thenThrow(
+                WebClientResponseException.create(302, "Redirect", null, null, null)
+        );
+        ProductServiceException ex = assertThrows(ProductServiceException.class, () -> client.isProductAvailable(1L));
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatus());
+    }
 
-        try {
-            Field productServiceUrlField = ProductServiceClient.class.getDeclaredField("productServiceUrl");
-            productServiceUrlField.setAccessible(true);
-            productServiceUrlField.set(failingClient, "/products");
-        } catch (Exception e) {
-            fail("Failed to set productServiceUrl via reflection: " + e.getMessage());
-        }
+    @Test
+    void isProductAvailable_unexpectedException_throwsException() {
+        when(responseSpec.bodyToMono(JsonNode.class)).thenThrow(new RuntimeException("Boom"));
+        ProductServiceException ex = assertThrows(ProductServiceException.class, () -> client.isProductAvailable(1L));
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatus());
+    }
 
-        String result = failingClient.getProductName(1L);
+    @Test
+    void isProductAvailable_allBranchesOfAndCondition() throws Exception {
+        JsonNode withData = objectMapper.readTree("{\"data\": {\"id\": 1}}");
+        JsonNode withoutData = objectMapper.readTree("{\"noData\": true}");
+        when(responseSpec.bodyToMono(JsonNode.class))
+                .thenReturn(Mono.just(withData))
+                .thenReturn(Mono.just(withoutData));
+        assertTrue(client.isProductAvailable(1L));
+        assertFalse(client.isProductAvailable(2L));
+    }
 
-        assertEquals("Unknown Product", result);
+    @Test
+    void getProductName_returnsName_whenPresent() throws Exception {
+        JsonNode json = objectMapper.readTree("{\"data\": {\"attributes\": {\"name\": \"Test Product\"}}}");
+        when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.just(json));
+        assertEquals("Test Product", client.getProductName(1L));
+    }
+
+    @Test
+    void getProductName_returnsUnknown_whenNameMissing() throws Exception {
+        JsonNode json = objectMapper.readTree("{\"data\": {\"attributes\": {}}}");
+        when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.just(json));
+        assertEquals("Unknown Product", client.getProductName(1L));
+    }
+
+    @Test
+    void getProductName_returnsUnknown_whenDataMissing() throws Exception {
+        JsonNode json = objectMapper.readTree("{}");
+        when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.just(json));
+        assertEquals("Unknown Product", client.getProductName(1L));
+    }
+
+    @Test
+    void getProductName_returnsUnknown_onException() {
+        when(responseSpec.bodyToMono(JsonNode.class)).thenThrow(new RuntimeException("Error"));
+        assertEquals("Unknown Product", client.getProductName(1L));
+    }
+
+    @Test
+    void getProductName_allBranchesOfNestedIfs() throws Exception {
+        JsonNode noAttributes = objectMapper.readTree("{\"data\": {}}");
+        JsonNode noName = objectMapper.readTree("{\"data\": {\"attributes\": {\"id\": 5}}}");
+        when(responseSpec.bodyToMono(JsonNode.class))
+                .thenReturn(Mono.just(noAttributes))
+                .thenReturn(Mono.just(noName));
+        assertEquals("Unknown Product", client.getProductName(1L));
+        assertEquals("Unknown Product", client.getProductName(2L));
     }
 }

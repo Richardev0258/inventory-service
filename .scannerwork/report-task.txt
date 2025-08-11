@@ -2,5 +2,5 @@ projectKey=inventory-service
 serverUrl=http://localhost:9000
 serverVersion=25.7.0.110598
 dashboardUrl=http://localhost:9000/dashboard?id=inventory-service
-ceTaskId=213d9a2c-20a7-4ec8-b5c1-3cab6500a2ad
-ceTaskUrl=http://localhost:9000/api/ce/task?id=213d9a2c-20a7-4ec8-b5c1-3cab6500a2ad
+ceTaskId=5387cf16-bc1a-4a6b-8b04-1ee21e0da41e
+ceTaskUrl=http://localhost:9000/api/ce/task?id=5387cf16-bc1a-4a6b-8b04-1ee21e0da41e
