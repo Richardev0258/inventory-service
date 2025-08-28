@@ -32,6 +32,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureWebMvc
 class InventoryIntegrationTest {
 
+    private static final String API_KEY_HEADER = "x-api-key";
+    private static final String TEST_API_KEY = "TEST_INVENTORY_KEY";
+
     @Autowired
     private WebApplicationContext context;
 
@@ -50,7 +53,6 @@ class InventoryIntegrationTest {
     public void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
         inventoryRepository.deleteAll();
-
         when(productServiceClient.isProductAvailable(anyLong())).thenReturn(true);
         when(productServiceClient.getProductName(anyLong())).thenReturn("Test Product");
     }
@@ -75,6 +77,7 @@ class InventoryIntegrationTest {
         request.setQuantity(100);
 
         mockMvc.perform(post("/inventory")
+                        .header(API_KEY_HEADER, TEST_API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -89,7 +92,8 @@ class InventoryIntegrationTest {
         inventory.setQuantity(50);
         inventoryRepository.save(inventory);
 
-        mockMvc.perform(get("/inventory/1"))
+        mockMvc.perform(get("/inventory/1")
+                        .header(API_KEY_HEADER, TEST_API_KEY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.productId").value(1L))
                 .andExpect(jsonPath("$.data.quantity").value(50));
@@ -97,7 +101,8 @@ class InventoryIntegrationTest {
 
     @Test
     public void shouldReturn404ForMissingInventory() throws Exception {
-        mockMvc.perform(get("/inventory/999"))
+        mockMvc.perform(get("/inventory/999")
+                        .header(API_KEY_HEADER, TEST_API_KEY))
                 .andExpect(status().isNotFound());
     }
 
@@ -106,7 +111,8 @@ class InventoryIntegrationTest {
         inventoryRepository.save(new Inventory(null, 1L, 100));
         inventoryRepository.save(new Inventory(null, 2L, 200));
 
-        mockMvc.perform(get("/inventory"))
+        mockMvc.perform(get("/inventory")
+                        .header(API_KEY_HEADER, TEST_API_KEY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].productId").value(1L))
@@ -125,6 +131,7 @@ class InventoryIntegrationTest {
         request.setQuantity(3);
 
         mockMvc.perform(post("/inventory/purchases")
+                        .header(API_KEY_HEADER, TEST_API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -132,9 +139,10 @@ class InventoryIntegrationTest {
                 .andExpect(jsonPath("$.data.purchasedQuantity").value(3))
                 .andExpect(jsonPath("$.data.productName").value("Test Product"));
 
-        mockMvc.perform(get("/inventory/1"))
+        mockMvc.perform(get("/inventory/1")
+                        .header(API_KEY_HEADER, TEST_API_KEY))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.quantity").value(7)); // 10 - 3 = 7
+                .andExpect(jsonPath("$.data.quantity").value(7));
     }
 
     @Test
@@ -149,6 +157,7 @@ class InventoryIntegrationTest {
         request.setQuantity(5);
 
         mockMvc.perform(post("/inventory/purchases")
+                        .header(API_KEY_HEADER, TEST_API_KEY)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());

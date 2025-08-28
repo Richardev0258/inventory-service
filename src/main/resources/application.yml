@@ -25,3 +25,6 @@ management:
   endpoint:
     health:
       show-details: always
+
+security:
+  api-key: INVENTORY_SERVICE_KEY

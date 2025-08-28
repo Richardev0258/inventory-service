@@ -20,3 +20,6 @@ spring:
 product:
   service:
     url: http://localhost:8081/products
+
+security:
+  api-key: TEST_INVENTORY_KEY
