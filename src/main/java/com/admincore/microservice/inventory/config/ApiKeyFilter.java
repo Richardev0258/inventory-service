@@ -1,41 +1,44 @@
 package com.admincore.microservice.inventory.config;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
+import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
 @Component
-public class ApiKeyFilter extends OncePerRequestFilter {
+public class ApiKeyFilter implements Filter {
 
-    private static final String API_KEY_HEADER = "X-API-KEY";
-
-    private final String expectedApiKey;
-
-    public ApiKeyFilter(@Value("${security.api-key}") String expectedApiKey) {
-        this.expectedApiKey = expectedApiKey;
-    }
+    @Value("${security.api-key}")
+    private String apiKey;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain)
-            throws ServletException, IOException {
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+            throws IOException, ServletException {
 
-        String apiKey = request.getHeader(API_KEY_HEADER);
+        HttpServletRequest httpRequest = (HttpServletRequest) request;
+        HttpServletResponse httpResponse = (HttpServletResponse) response;
 
-        if (apiKey == null || !apiKey.equals(expectedApiKey)) {
-            response.setStatus(HttpStatus.UNAUTHORIZED.value());
-            response.getWriter().write("Invalid or missing API Key");
+        String requestApiKey = httpRequest.getHeader("x-api-key");
+
+        if (requestApiKey == null || !requestApiKey.equals(apiKey)) {
+            httpResponse.setStatus(HttpStatus.UNAUTHORIZED.value());
             return;
         }
 
-        filterChain.doFilter(request, response);
+        chain.doFilter(request, response);
+    }
+
+    @Override
+    public void init(FilterConfig filterConfig) throws ServletException {
+        Filter.super.init(filterConfig);
+    }
+
+    @Override
+    public void destroy() {
+        Filter.super.destroy();
     }
 }
