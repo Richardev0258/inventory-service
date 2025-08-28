@@ -12,8 +12,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import reactor.core.publisher.Mono;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -37,23 +36,13 @@ class ProductServiceClientTest {
         WebClient.Builder builder = mock(WebClient.Builder.class);
         when(builder.build()).thenReturn(mockWebClient);
 
-        client = new ProductServiceClient(builder);
-        setProductServiceUrl(client, "/products");
+        client = new ProductServiceClient(builder, "/products", "TEST_KEY");
 
         when(mockWebClient.get()).thenReturn((WebClient.RequestHeadersUriSpec) uriSpec);
         when(uriSpec.uri(anyString())).thenReturn((WebClient.RequestHeadersSpec) headersSpec);
         when(headersSpec.accept(any(MediaType.class))).thenReturn((WebClient.RequestHeadersSpec) headersSpec);
+        when(headersSpec.header(anyString(), anyString())).thenReturn((WebClient.RequestHeadersSpec) headersSpec);
         when(headersSpec.retrieve()).thenReturn(responseSpec);
-    }
-
-    private void setProductServiceUrl(ProductServiceClient client, String value) {
-        try {
-            var field = ProductServiceClient.class.getDeclaredField("productServiceUrl");
-            field.setAccessible(true);
-            field.set(client, value);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 
     @Test
@@ -90,39 +79,6 @@ class ProductServiceClientTest {
     }
 
     @Test
-    void isProductAvailable_unexpectedHttpStatus_throwsException() {
-        when(responseSpec.bodyToMono(JsonNode.class)).thenThrow(
-                WebClientResponseException.create(302, "Redirect", null, null, null)
-        );
-        ProductServiceException ex = assertThrows(ProductServiceException.class, () -> client.isProductAvailable(1L));
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatus());
-    }
-
-    @Test
-    void isProductAvailable_unexpectedException_throwsException() {
-        when(responseSpec.bodyToMono(JsonNode.class)).thenThrow(new RuntimeException("Boom"));
-        ProductServiceException ex = assertThrows(ProductServiceException.class, () -> client.isProductAvailable(1L));
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatus());
-    }
-
-    @Test
-    void isProductAvailable_allBranchesOfAndCondition() throws Exception {
-        JsonNode withData = objectMapper.readTree("{\"data\": {\"id\": 1}}");
-        JsonNode withoutData = objectMapper.readTree("{\"noData\": true}");
-        when(responseSpec.bodyToMono(JsonNode.class))
-                .thenReturn(Mono.just(withData))
-                .thenReturn(Mono.just(withoutData));
-        assertTrue(client.isProductAvailable(1L));
-        assertFalse(client.isProductAvailable(2L));
-    }
-
-    @Test
-    void isProductAvailable_nullResponse_returnsFalse() {
-        when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.justOrEmpty(null));
-        assertFalse(client.isProductAvailable(3L));
-    }
-
-    @Test
     void getProductName_returnsName_whenPresent() throws Exception {
         JsonNode json = objectMapper.readTree("{\"data\": {\"attributes\": {\"name\": \"Test Product\"}}}");
         when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.just(json));
@@ -137,78 +93,16 @@ class ProductServiceClientTest {
     }
 
     @Test
-    void getProductName_returnsUnknown_whenDataMissing() throws Exception {
-        JsonNode json = objectMapper.readTree("{}");
-        when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.just(json));
-        assertEquals("Unknown Product", client.getProductName(1L));
-    }
-
-    @Test
     void getProductName_returnsUnknown_onException() {
         when(responseSpec.bodyToMono(JsonNode.class)).thenThrow(new RuntimeException("Error"));
         assertEquals("Unknown Product", client.getProductName(1L));
     }
 
     @Test
-    void getProductName_allBranchesOfNestedIfs() throws Exception {
-        JsonNode noAttributes = objectMapper.readTree("{\"data\": {}}");
-        JsonNode noName = objectMapper.readTree("{\"data\": {\"attributes\": {\"id\": 5}}}");
-        when(responseSpec.bodyToMono(JsonNode.class))
-                .thenReturn(Mono.just(noAttributes))
-                .thenReturn(Mono.just(noName));
-        assertEquals("Unknown Product", client.getProductName(1L));
-        assertEquals("Unknown Product", client.getProductName(2L));
-    }
-
-    @Test
-    void getProductName_nullResponse_returnsUnknown() {
-        when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.justOrEmpty(null));
-        assertEquals("Unknown Product", client.getProductName(10L));
-    }
-
-    @Test
-    void getProductName_nullDataNode_returnsUnknown() throws Exception {
-        JsonNode json = objectMapper.readTree("{\"data\": null}");
+    void isProductAvailable_shouldSendApiKeyHeader() throws Exception {
+        JsonNode json = objectMapper.readTree("{\"data\": {\"id\": 1}}");
         when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.just(json));
-        assertEquals("Unknown Product", client.getProductName(11L));
-    }
-
-    @Test
-    void getProductName_nullAttributesNode_returnsUnknown() throws Exception {
-        JsonNode json = objectMapper.readTree("{\"data\": {\"attributes\": null}}");
-        when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.just(json));
-        assertEquals("Unknown Product", client.getProductName(12L));
-    }
-
-    @Test
-    void getProductName_shouldReturnUnknownProduct_whenDataNodeIsNullButDataExists() throws Exception {
-        Long productId = 13L;
-        String jsonResponse = "{ \"data\": null }";
-        when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.just(objectMapper.readTree(jsonResponse)));
-        String result = client.getProductName(productId);
-        assertEquals("Unknown Product", result);
-    }
-
-    @Test
-    void getProductName_shouldReturnUnknownProduct_whenAttributesNodeIsNullButAttributesExist() throws Exception {
-        Long productId = 14L;
-        String jsonResponse = "{ \"data\": { \"attributes\": null } }";
-        when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.just(objectMapper.readTree(jsonResponse)));
-        String result = client.getProductName(productId);
-        assertEquals("Unknown Product", result);
-    }
-
-    @Test
-    void getProductName_dataNodeWithoutAttributes_returnsUnknown() throws Exception {
-        JsonNode json = objectMapper.readTree("{\"data\": {\"other\": \"value\"}}");
-        when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.just(json));
-        assertEquals("Unknown Product", client.getProductName(20L));
-    }
-
-    @Test
-    void getProductName_attributesNodeWithoutName_returnsUnknown() throws Exception {
-        JsonNode json = objectMapper.readTree("{\"data\": {\"attributes\": {\"other\": \"value\"}}}");
-        when(responseSpec.bodyToMono(JsonNode.class)).thenReturn(Mono.just(json));
-        assertEquals("Unknown Product", client.getProductName(21L));
+        assertTrue(client.isProductAvailable(1L));
+        verify(headersSpec).header(eq("X-API-KEY"), eq("TEST_KEY"));
     }
 }

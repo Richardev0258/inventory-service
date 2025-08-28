@@ -16,6 +16,7 @@ logging:
 product:
   service:
     url: http://localhost:8081/products
+    api-key: PRODUCT_SERVICE_KEY
 
 management:
   endpoints:
