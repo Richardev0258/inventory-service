@@ -1,0 +1,33 @@
+spring:
+  datasource:
+    url: jdbc:sqlite:C:/Cursos/Java/admin-core/bd/admin_core.db
+    driver-class-name: org.sqlite.JDBC
+    type: org.springframework.jdbc.datasource.DriverManagerDataSource
+
+  jpa:
+    database-platform: com.admincore.microservice.inventory.config.SQLiteDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          use_get_generated_keys: false
+        id:
+          new_generator_mappings: false
+
+# spring.sql.init.mode: always
+
+logging:
+  level:
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+
+product:
+  service:
+    url: http://localhost:8081/products
+
+server:
+  servlet:
+    context-path: ""

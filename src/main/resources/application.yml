@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: inventory-service
+  profiles:
+    active: local
+server:
+  port: 8082
+
+spring.mvc.log-request-details: true
+logging:
+  level:
+    org.springframework.web: DEBUG
+    com.admincore.microservice: DEBUG
+    org.hibernate.SQL: DEBUG
+
+product:
+  service:
+    url: http://localhost:8081/products
+    api-key: PRODUCT_SERVICE_KEY
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+security:
+  api-key: INVENTORY_SERVICE_KEY
