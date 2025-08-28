@@ -15,12 +15,15 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 public class ProductServiceClient {
 
     private final WebClient webClient;
+    private final String productServiceUrl;
+    private final String productServiceApiKey;
 
-    @Value("${product.service.url}")
-    private String productServiceUrl;
-
-    public ProductServiceClient(WebClient.Builder webClientBuilder) {
+    public ProductServiceClient(WebClient.Builder webClientBuilder,
+                                @Value("${product.service.url}") String productServiceUrl,
+                                @Value("${product.service.api-key}") String productServiceApiKey) {
         this.webClient = webClientBuilder.build();
+        this.productServiceUrl = productServiceUrl;
+        this.productServiceApiKey = productServiceApiKey;
     }
 
     public boolean isProductAvailable(Long productId) {
@@ -28,6 +31,7 @@ public class ProductServiceClient {
             JsonNode response = webClient.get()
                     .uri(productServiceUrl + "/" + productId)
                     .accept(MediaType.APPLICATION_JSON)
+                    .header("X-API-KEY", productServiceApiKey)
                     .retrieve()
                     .bodyToMono(JsonNode.class)
                     .block();
@@ -58,6 +62,7 @@ public class ProductServiceClient {
             JsonNode response = webClient.get()
                     .uri(productServiceUrl + "/" + productId)
                     .accept(MediaType.APPLICATION_JSON)
+                    .header("X-API-KEY", productServiceApiKey)
                     .retrieve()
                     .bodyToMono(JsonNode.class)
                     .block();
