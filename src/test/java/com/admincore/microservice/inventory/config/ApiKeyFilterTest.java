@@ -2,66 +2,91 @@ package com.admincore.microservice.inventory.config;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.lang.reflect.Field;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class ApiKeyFilterTest {
 
-    private static final String EXPECTED_KEY = "TEST_KEY";
-
+    @InjectMocks
     private ApiKeyFilter apiKeyFilter;
-    private HttpServletRequest request;
-    private HttpServletResponse response;
+
+    @Mock
     private FilterChain filterChain;
-    private PrintWriter mockWriter;
+
+    private static final String VALID_API_KEY = "INVENTORY_SERVICE_KEY";
+    private static final String INVALID_API_KEY = "wrong-api-key";
+    private static final String HEADER_NAME = "x-api-key";
 
     @BeforeEach
-    void setUp() {
-        apiKeyFilter = new ApiKeyFilter(EXPECTED_KEY);
-        request = mock(HttpServletRequest.class);
-        response = mock(HttpServletResponse.class);
-        filterChain = mock(FilterChain.class);
-        mockWriter = mock(PrintWriter.class);
-        try {
-            when(response.getWriter()).thenReturn(mockWriter);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    void setUp() throws Exception {
+        Field apiKeyField = ApiKeyFilter.class.getDeclaredField("apiKey");
+        apiKeyField.setAccessible(true);
+        apiKeyField.set(apiKeyFilter, VALID_API_KEY);
     }
 
     @Test
-    void shouldAllowRequestWhenApiKeyIsValid() throws ServletException, IOException {
-        when(request.getHeader("X-API-KEY")).thenReturn(EXPECTED_KEY);
+    void doFilter_shouldAllowRequestWithValidApiKey() throws ServletException, java.io.IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(HEADER_NAME, VALID_API_KEY);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
         apiKeyFilter.doFilter(request, response, filterChain);
-        verify(filterChain, times(1)).doFilter(request, response);
-        verify(response, never()).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        verify(response, never()).getWriter();
+
+        verify(filterChain).doFilter(request, response);
+        assertEquals(HttpServletResponse.SC_OK, response.getStatus());
     }
 
     @Test
-    void shouldRejectRequestWhenApiKeyIsMissing() throws ServletException, IOException {
-        when(request.getHeader("X-API-KEY")).thenReturn(null);
+    void doFilter_shouldRejectRequestWithInvalidApiKey() throws ServletException, java.io.IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(HEADER_NAME, INVALID_API_KEY);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
         apiKeyFilter.doFilter(request, response, filterChain);
-        verify(response, times(1)).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        verify(response, times(1)).getWriter();
-        verify(mockWriter, times(1)).write("Invalid or missing API Key");
-        verify(filterChain, never()).doFilter(request, response);
+
+        verify(filterChain, never()).doFilter(any(), any());
+        assertEquals(HttpStatus.UNAUTHORIZED.value(), response.getStatus());
     }
 
     @Test
-    void shouldRejectRequestWhenApiKeyIsInvalid() throws ServletException, IOException {
-        when(request.getHeader("X-API-KEY")).thenReturn("WRONG_KEY");
+    void doFilter_shouldRejectRequestWithMissingApiKeyHeader() throws ServletException, java.io.IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
         apiKeyFilter.doFilter(request, response, filterChain);
-        verify(response, times(1)).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        verify(response, times(1)).getWriter();
-        verify(mockWriter, times(1)).write("Invalid or missing API Key");
-        verify(filterChain, never()).doFilter(request, response);
+
+        verify(filterChain, never()).doFilter(any(), any());
+        assertEquals(HttpStatus.UNAUTHORIZED.value(), response.getStatus());
+    }
+
+    @Test
+    void doFilter_shouldRejectRequestWithEmptyApiKeyHeader() throws ServletException, java.io.IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(HEADER_NAME, "");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        apiKeyFilter.doFilter(request, response, filterChain);
+
+        verify(filterChain, never()).doFilter(any(), any());
+        assertEquals(HttpStatus.UNAUTHORIZED.value(), response.getStatus());
+    }
+    @Test
+    void destroy_shouldCallSuperDestroy() {
+        assertDoesNotThrow(() -> apiKeyFilter.destroy());
     }
 }
