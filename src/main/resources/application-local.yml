@@ -31,3 +31,6 @@ product:
 server:
   servlet:
     context-path: ""
+
+security:
+  api-key: INVENTORY_SERVICE_KEY
