@@ -31,22 +31,18 @@ public class InventoryServiceImpl implements InventoryService {
     public InventoryResponse createOrUpdateInventory(InventoryRequest request) {
         log.info("Creating or updating inventory for product ID: {}", request.getProductId());
 
-        // Validar que el producto exista en el servicio de productos
         if (!productServiceClient.isProductAvailable(request.getProductId())) {
             throw new IllegalArgumentException("Product with ID " + request.getProductId() + " does not exist in the product service");
         }
 
-        // Buscar si ya existe un registro de inventario para este producto
         return inventoryRepository.findByProductId(request.getProductId())
                 .map(existingInventory -> {
-                    // Si existe, actualizar la cantidad
                     existingInventory.setQuantity(request.getQuantity());
                     Inventory savedInventory = inventoryRepository.save(existingInventory);
                     log.info("Updated inventory for product ID: {}", request.getProductId());
                     return toResponse(savedInventory);
                 })
                 .orElseGet(() -> {
-                    // Si no existe, crear uno nuevo
                     Inventory newInventory = new Inventory();
                     newInventory.setProductId(request.getProductId());
                     newInventory.setQuantity(request.getQuantity());
@@ -79,12 +75,10 @@ public class InventoryServiceImpl implements InventoryService {
     public PurchaseResponse purchase(PurchaseRequest request) {
         log.info("Processing purchase for product ID: {} with quantity: {}", request.getProductId(), request.getQuantity());
 
-        // 1. Validar que el producto exista en el servicio de productos
         if (!productServiceClient.isProductAvailable(request.getProductId())) {
             throw new IllegalArgumentException("Product with ID " + request.getProductId() + " does not exist");
         }
 
-        // 2. Verificar disponibilidad en inventario
         Inventory inventory = inventoryRepository.findByProductId(request.getProductId())
                 .orElseThrow(() -> new InventoryNotFoundException("Inventory not found for product ID: " + request.getProductId()));
 
@@ -95,13 +89,11 @@ public class InventoryServiceImpl implements InventoryService {
             );
         }
 
-        // 3. Actualizar inventario (descontar cantidad)
         int newQuantity = inventory.getQuantity() - request.getQuantity();
         inventory.setQuantity(newQuantity);
         inventoryRepository.save(inventory);
         log.info("Updated inventory for product ID: {}. New quantity: {}", request.getProductId(), newQuantity);
 
-        // 4. Preparar respuesta
         String productName = productServiceClient.getProductName(request.getProductId());
         PurchaseResponse response = new PurchaseResponse();
         response.setProductId(request.getProductId());
