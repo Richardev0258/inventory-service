@@ -86,6 +86,29 @@ class ApiKeyFilterTest {
         assertEquals(HttpStatus.UNAUTHORIZED.value(), response.getStatus());
     }
     @Test
+    void doFilter_shouldAllowSwaggerUiWithoutApiKey() throws ServletException, java.io.IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/swagger-ui/index.html");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        apiKeyFilter.doFilter(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        assertEquals(HttpServletResponse.SC_OK, response.getStatus());
+    }
+
+    @Test
+    void doFilter_shouldAllowV3ApiDocsWithoutApiKey() throws ServletException, java.io.IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/v3/api-docs");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        apiKeyFilter.doFilter(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        assertEquals(HttpServletResponse.SC_OK, response.getStatus());
+    }
+    @Test
     void destroy_shouldCallSuperDestroy() {
         assertDoesNotThrow(() -> apiKeyFilter.destroy());
     }
