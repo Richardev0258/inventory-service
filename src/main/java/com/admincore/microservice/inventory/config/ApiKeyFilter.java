@@ -22,6 +22,13 @@ public class ApiKeyFilter implements Filter {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpServletResponse httpResponse = (HttpServletResponse) response;
 
+        String path = httpRequest.getRequestURI();
+
+        if (path.startsWith("/swagger-ui") || path.startsWith("/v3/api-docs")) {
+            chain.doFilter(request, response);
+            return;
+        }
+
         String requestApiKey = httpRequest.getHeader("x-api-key");
 
         if (requestApiKey == null || !requestApiKey.equals(apiKey)) {
